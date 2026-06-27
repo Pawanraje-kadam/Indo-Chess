@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import { sounds } from '../utils/sounds';
 
 export default function GameOverOverlay() {
-  const { gameState, newGame, gameConfig, setView, startAnalysis } = useGameStore();
+  const { gameState, newGame, gameConfig, setView, startAnalysis, dismissGameOver } = useGameStore();
 
   useEffect(() => {
     if (gameState.isGameOver) sounds.gameEnd();
