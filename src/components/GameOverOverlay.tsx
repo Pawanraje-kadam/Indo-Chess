@@ -38,7 +38,23 @@ export default function GameOverOverlay() {
   return (
     <div className="overlay animate-fade-in" style={{ position:'absolute', borderRadius:'var(--radius)' }}>
       <div className="modal animate-fade-in-scale" style={{ boxShadow:`0 0 60px ${color}28, var(--shadow-xl)` }}>
-        <div style={{ height:4, background:`linear-gradient(90deg,${color},transparent)` }} />
+        <div style={{ position: 'relative' }}>
+  <button
+    onClick={dismissGameOver}
+    style={{
+      position: 'absolute', top: 10, right: 10, zIndex: 10,
+      width: 30, height: 30, borderRadius: '50%',
+      border: 'none', background: 'var(--elevated)',
+      color: 'var(--text-muted)', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 20, lineHeight: 1, transition: 'all 150ms',
+    }}
+    onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
+    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+  >×</button>
+  <div style={{ height: 4, background: `linear-gradient(90deg,${color},transparent)` }} />
+  <div className="modal-body">
+     <div style={{ height:4, background:`linear-gradient(90deg,${color},transparent)` }} />
         <div className="modal-body">
           <div className="modal-icon">{icon}</div>
           <div className="modal-title" style={{ color }}>{title}</div>
