@@ -87,5 +87,5 @@ export default function GameOverOverlay() {
       </div>
     </div>
   </div>
- 
+ </div>
 
