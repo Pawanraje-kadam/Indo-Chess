@@ -67,7 +67,13 @@ interface GameStore {
   toggleCoordinates: () => void;
   goToMove: (index: number) => void;
   tickClock: () => void;
-  stopClock: () => void;
+  stopClock: () => void; 
+  dismissGameOver: () => {
+  const { gameState } = get();
+  const s = cloneGameState(gameState);
+  s.isGameOver = false;
+  set({ gameState: s });
+},
   setPlayerName: (name: string) => void;
   startAnalysis: () => void;
 }
