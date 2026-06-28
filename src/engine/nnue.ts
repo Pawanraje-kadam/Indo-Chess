@@ -100,8 +100,10 @@ export class NNUEWeights {
 // ── Global weight instance (singleton, lazy-loaded from trained file) ─────────
 export const NNUE_WEIGHTS = new NNUEWeights();
 let nnueReady = false;
+let nnueTrained = false; // true only when weights loaded from file, not Xavier init
 
-export function isNNUEReady(): boolean { return nnueReady; }
+export function isNNUEReady(): boolean { return nnueReady && nnueTrained; }
+export function isNNUETrained(): boolean { return nnueTrained; }
 
 export async function loadNNUEWeights(url: string): Promise<boolean> {
   try {
@@ -110,7 +112,8 @@ export async function loadNNUEWeights(url: string): Promise<boolean> {
     const buf = await res.arrayBuffer();
     NNUE_WEIGHTS.deserialize(buf);
     nnueReady = true;
-    console.log('[NNUE] Weights loaded successfully');
+    nnueTrained = true;
+    console.log('[NNUE] Trained weights loaded successfully');
     return true;
   } catch (e) {
     console.warn('[NNUE] Could not load weights, using Xavier init');

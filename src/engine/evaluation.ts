@@ -248,12 +248,13 @@ export function evaluateRoot(
   nnueAcc?: import('./nnue').Accumulator,
   sideToMove: import('./types').PieceColor = 'white',
 ): number {
-  // Use NNUE when weights are loaded — much stronger than hand-tuned eval
+  // NNUE only activates when weights.bin is loaded from public/ folder
+  // Without a trained weights file, classical eval runs at full strength
   if (isNNUEReady() && nnueAcc) {
     const nnueScore = nnueEval(nnueAcc, sideToMove);
-    // Blend: 80% NNUE + 20% classical for stability during early training
     const classicalScore = evaluateClassical(board, isEndgame);
-    return Math.round(nnueScore * 0.8 + classicalScore * 0.2);
+    // 70% NNUE + 30% classical blend for stability
+    return Math.round(nnueScore * 0.7 + classicalScore * 0.3);
   }
   return evaluateClassical(board, isEndgame);
 }
