@@ -1,0 +1,77 @@
+name: Train NNUE Weights
+
+on:
+  workflow_dispatch:          # Run manually from GitHub Actions tab
+  schedule:
+    - cron: '0 2 * * 0'      # Auto-run every Sunday at 2am (optional)
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download Lichess games
+        run: |
+          echo "Downloading 2000 rated games from Magnus Carlsen (DrNykterstein)..."
+          curl -s -L \
+            "https://lichess.org/games/export/DrNykterstein?max=2000&evals=false&clocks=false&perfType=blitz,rapid,classical" \
+            -H "Accept: application/x-chess-pgn" \
+            -o games.pgn
+          echo "Downloaded $(wc -l < games.pgn) lines"
+
+      - name: Download additional strong player games
+        run: |
+          echo "Downloading Hikaru games..."
+          curl -s -L \
+            "https://lichess.org/games/export/hikaru?max=1000&evals=false&clocks=false&perfType=blitz" \
+            -H "Accept: application/x-chess-pgn" \
+            >> games.pgn
+          echo "Downloading Firouzja games..."
+          curl -s -L \
+            "https://lichess.org/games/export/alireza2003?max=1000&evals=false&clocks=false&perfType=blitz" \
+            -H "Accept: application/x-chess-pgn" \
+            >> games.pgn
+          TOTAL=$(grep -c "^\[Event" games.pgn || echo 0)
+          echo "Total games collected: $TOTAL"
+
+      - name: Create public directory
+        run: mkdir -p public
+
+      - name: Run NNUE trainer
+        run: |
+          echo "Starting NNUE training..."
+          node scripts/train-nnue.mjs games.pgn 10 public/weights.bin
+          echo "Training complete!"
+          ls -lh public/weights.bin
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload weights as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nnue-weights
+          path: public/weights.bin
+          retention-days: 90
+
+      - name: Commit weights back to repo
+        run: |
+          git config --global user.name  "NNUE Trainer Bot"
+          git config --global user.email "bot@mindmove.chess"
+          git add public/weights.bin
+          git diff --staged --quiet || git commit -m "🧠 Update NNUE weights [$(date '+%Y-%m-%d')]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
