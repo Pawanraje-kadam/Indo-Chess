@@ -1,3 +1,4 @@
+import { nnueEval, buildAccumulator, isNNUEReady } from './nnue';
 import { Board, Piece, PieceColor, PieceType, Position, PIECE_VALUES } from './types';
 import { isInBounds, isSquareAttacked } from './board';
 
@@ -241,7 +242,23 @@ function rookBonus(board: Board, color: PieceColor): number {
 }
 
 // ── Full evaluation ───────────────────────────────────────────────────────────
-export function evaluateRoot(board: Board, isEndgame: boolean): number {
+export function evaluateRoot(
+  board: Board,
+  isEndgame: boolean,
+  nnueAcc?: import('./nnue').Accumulator,
+  sideToMove: import('./types').PieceColor = 'white',
+): number {
+  // Use NNUE when weights are loaded — much stronger than hand-tuned eval
+  if (isNNUEReady() && nnueAcc) {
+    const nnueScore = nnueEval(nnueAcc, sideToMove);
+    // Blend: 80% NNUE + 20% classical for stability during early training
+    const classicalScore = evaluateClassical(board, isEndgame);
+    return Math.round(nnueScore * 0.8 + classicalScore * 0.2);
+  }
+  return evaluateClassical(board, isEndgame);
+}
+
+function evaluateClassical(board: Board, isEndgame: boolean): number {
   let score = 0;
 
   // Find kings
