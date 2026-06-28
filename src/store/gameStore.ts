@@ -10,7 +10,11 @@ import {
 } from '../engine/board';
 import { findBestMove, evaluatePosition } from '../engine/ai';
 import { analyzeMove, computeSummary } from '../engine/analysis';
+import { loadOpeningBook } from '../engine/openingBook';
 import { sounds } from '../utils/sounds';
+
+// Load opening book in background — won't block gameplay
+loadOpeningBook('/book.bin').catch(() => {});
 
 interface ClockState {
   white: number;
