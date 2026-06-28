@@ -1,6 +1,7 @@
 import { GameState, Move, Difficulty, PieceColor, PIECE_VALUES, PieceType, CastlingRights, Position } from './types';
 import { generateLegalMoves, generateLegalCaptures, makeMoveMutating, unmakeMove, isInCheck } from './board';
 import { PST, getPSTValue, evaluateRoot, determineIsEndgame } from './evaluation';
+import { probeBook, polyglotHash, bookLoaded } from './openingBook';
 
 const INFINITY = 999999;
 const MATE_SCORE = 100000;
@@ -269,6 +270,12 @@ function alphaBeta(
     if (nullScore >= beta) return beta;
   }
 
+  // Futility pruning — skip moves near leaf that can't raise alpha
+  const staticEval = evalScore * (color === 'white' ? 1 : -1);
+  if (depth === 1 && !isCheck && staticEval + 125 < alpha) {
+    return quiescence(state, alpha, beta, color, telemetry, hash, evalScore, isEndgame);
+  }
+
   const moves = generateLegalMoves(state, color, true);
   if (moves.length === 0) return isCheck ? -(MATE_SCORE + depth) : 0;
 
@@ -361,6 +368,22 @@ export function findBestMove(state: GameState, difficulty: Difficulty): Move | n
   const isEndgame = determineIsEndgame(state.board);
   const baseHash = computeBaseZobristHash(state);
   const baseScore = evaluateRoot(state.board, isEndgame);
+
+  // Opening book probe
+  if (bookLoaded) {
+    const bookHash = polyglotHash(state);
+    const bookMove = probeBook(bookHash);
+    if (bookMove) {
+      const matched = moves.find(m =>
+        m.from.row === bookMove.from.row && m.from.col === bookMove.from.col &&
+        m.to.row   === bookMove.to.row   && m.to.col   === bookMove.to.col
+      );
+      if (matched) {
+        console.log('[OpeningBook] Playing book move:', matched.san);
+        return matched;
+      }
+    }
+  }
 
   let completedBestMove: Move = moves[0];
   let previousScore = 0;
