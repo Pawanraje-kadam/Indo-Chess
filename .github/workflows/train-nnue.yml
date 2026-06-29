@@ -1,76 +1,81 @@
 name: Train NNUE Weights
 
 on:
-  workflow_dispatch:      # Allows you to trigger training manually with one click
+  workflow_dispatch:
   schedule:
-    - cron: '0 2 * * 0'   # Automatically runs every Sunday at 2 AM
+    - cron: '0 2 * * 0'
 
 permissions:
-  contents: write         # Crucial: Allows the runner bot to push the trained weights back to your repo
+  contents: write
 
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 180  # Generous 3-hour window to accommodate data ingestion and training epochs
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
-          cache: 'pip'    # Automatically saves and restores your python packages across runs
+          node-version: '20'
 
-      - name: Install Optimized Machine Learning Dependencies
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download opening book
         run: |
-          python -m pip install --upgrade pip
-          # Force the CPU wheel to avoid a massive 2GB+ CUDA download on a CPU-only runner
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install numpy python-chess
+          mkdir -p public
+          # Download a real Polyglot opening book (Performance.bin - 2.3MB, 600k+ positions)
+          curl -sL "https://github.com/michaeldv/donna_opening_books/raw/master/books/performance.bin" \
+            -o public/book.bin || \
+          curl -sL "https://raw.githubusercontent.com/official-stockfish/books/master/performance.bin" \
+            -o public/book.bin || \
+          echo "Book download failed - will use built-in moves"
+          ls -lh public/book.bin 2>/dev/null && echo "Book ready" || echo "No book file"
 
-      - name: Verify or Create Dataset Environment
+      - name: Download Lichess games for training
         run: |
-          # If you didn't commit a dataset.txt to git, this step ensures the script doesn't crash
-          if [ ! -f dataset.txt ]; then
-            echo "dataset.txt not found in workspace root. Creating fallback initialization tokens..."
-            echo "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 | 0.00" > dataset.txt
-          fi
+          echo "Downloading grandmaster games..."
+          curl -sL \
+            "https://lichess.org/games/export/DrNykterstein?max=2000&evals=false&clocks=false&perfType=blitz,rapid,classical" \
+            -H "Accept: application/x-chess-pgn" -o games.pgn
+          curl -sL \
+            "https://lichess.org/games/export/hikaru?max=1000&evals=false&clocks=false&perfType=blitz" \
+            -H "Accept: application/x-chess-pgn" >> games.pgn
+          curl -sL \
+            "https://lichess.org/games/export/alireza2003?max=1000&evals=false&clocks=false&perfType=blitz" \
+            -H "Accept: application/x-chess-pgn" >> games.pgn
+          echo "Games: $(grep -c '^\[Event' games.pgn || echo 0)"
 
-      - name: Run PyTorch NNUE Trainer
-        run: |
-          echo "Initiating neural network training loop..."
-          python train_nnue.py
-          echo "Training successfully completed!"
+      - name: Run NNUE trainer
+        run: node scripts/train-nnue.mjs games.pgn 10 public/weights.bin
 
-      - name: Archive Weights as Safe Artifact
+      - name: Build project
+        run: npm run build
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: compiled-nnue-weights
-          path: weights.bin
-          retention-days: 30
+          name: engine-assets
+          path: |
+            public/weights.bin
+            public/book.bin
+          retention-days: 90
 
-      - name: Commit Binary Weights Back to Engine Public Assets
+      - name: Commit back to repo
         run: |
-          git config --global user.name "NNUE Workflow Bot"
-          git config --global user.email "bot@engine.internal"
-          
-          # Ensure target directory exists and move the compiled brain over
-          mkdir -p public
-          cp weights.bin public/weights.bin
-          
-          git add public/weights.bin
-          
-          # Clean check: Only commit and push if the weights actually altered performance values
+          git config --global user.name  "NNUE Trainer Bot"
+          git config --global user.email "bot@mindmove.chess"
+          git add public/weights.bin public/book.bin
           if git diff --staged --quiet; then
-            echo "No structural changes found in weight evaluations. Skipping push."
+            echo "No changes to commit"
           else
-            git commit -m "🧠 Automated NNUE weights update [$(date '+%Y-%m-%d')]"
-            
-            # Fetch remote updates and layer our commit cleanly on top to avoid rejection
+            git commit -m "🧠 Update NNUE weights + opening book [$(date '+%Y-%m-%d')]"
             git pull --rebase origin main
-            
-            # Push the synchronized changes back home
             git push origin main
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
