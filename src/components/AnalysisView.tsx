@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import Board from './Board';
 import EvalBar from './EvalBar';
-import EvalGraph from './EvalGraph';
 import AnalysisMoveList from './AnalysisMoveList';
 import GameSummaryPanel from './GameSummaryPanel';
 import GameControls from './GameControls';
@@ -62,10 +61,7 @@ export default function AnalysisView() {
 
         {hasGame && (
           <>
-            {/* Eval Graph */}
-            <div className="card" style={{ padding:0, flexShrink:0 }}>
-              <EvalGraph />
-            </div>
+      
 
             {/* Summary + Moves tabs */}
             <div className="card" style={{ flex:1, display:'flex', flexDirection:'column', minHeight:0 }}>
